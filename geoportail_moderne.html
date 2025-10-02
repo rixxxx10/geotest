@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Géoportail</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            overflow: hidden;
+        }
+
+        .top-banner {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.4));
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            padding: 0 30px;
+            z-index: 1001;
+        }
+
+        .top-banner h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: white;
+            margin: 0;
+            letter-spacing: 0.5px;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        .panel {
+            position: absolute;
+            left: 20px;
+            top: 80px;
+            width: 280px;
+            max-height: calc(100vh - 120px);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .panel-header {
+            padding: 16px 18px;
+            background: #ffffff;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .panel-header h2 {
+            font-size: 13px;
+            font-weight: 600;
+            margin: 0;
+            color: #424242;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .panel-content {
+            padding: 12px;
+            overflow-y: auto;
+            flex: 1;
+            background: #fafafa;
+        }
+
+        .layer-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            margin-bottom: 6px;
+            background: #ffffff;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid #e0e0e0;
+        }
+
+        .layer-item:hover {
+            background: #f5f5f5;
+            border-color: #bdbdbd;
+        }
+
+        .layer-item.active {
+            background: #ffffff;
+            border-color: #424242;
+        }
+
+        .layer-checkbox {
+            width: 16px;
+            height: 16px;
+            margin-right: 10px;
+            cursor: pointer;
+            accent-color: #424242;
+        }
+
+        .layer-info {
+            flex: 1;
+        }
+
+        .layer-name {
+            font-weight: 500;
+            color: #212121;
+            margin-bottom: 2px;
+            font-size: 13px;
+        }
+
+        .layer-description {
+            font-size: 11px;
+            color: #757575;
+        }
+
+        .layer-delete {
+            padding: 4px 8px;
+            background: #424242;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .layer-item:hover .layer-delete {
+            opacity: 1;
+        }
+
+        .layer-delete:hover {
+            background: #212121;
+        }
+
+        .add-layer-btn {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            width: 56px;
+            height: 56px;
+            background: #424242;
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .add-layer-btn:hover {
+            transform: scale(1.05);
+            background: #212121;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+        }
+
+        .add-layer-btn:active {
+            transform: scale(0.95);
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .section-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #9e9e9e;
+            margin: 12px 0 8px 0;
+            padding-left: 2px;
+        }
+
+        .section-title:first-child {
+            margin-top: 0;
+        }
+
+        .panel-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .panel-content::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .panel-content::-webkit-scrollbar-thumb {
+            background: #cbd5e0;
+            border-radius: 3px;
+        }
+
+        .panel-content::-webkit-scrollbar-thumb:hover {
+            background: #a0aec0;
+        }
+
+        .notification {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 16px 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.3s ease;
+        }
+
+        .notification.show {
+            display: flex;
+        }
+
+        .notification.success {
+            border-left: 4px solid #424242;
+        }
+
+        .notification.error {
+            border-left: 4px solid #212121;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="top-banner">
+        <h1>🗺️ Géoportail</h1>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Couches cartographiques</h2>
+        </div>
+        <div class="panel-content" id="layersList">
+            <div class="section-title">Couches importées</div>
+            <div id="customLayers"></div>
+            <div class="section-title">Couche de base</div>
+            <div class="layer-item active" data-layer="osm">
+                <input type="checkbox" class="layer-checkbox" checked disabled>
+                <div class="layer-info">
+                    <div class="layer-name">OpenStreetMap</div>
+                    <div class="layer-description">Fond de carte standard</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button class="add-layer-btn" id="addLayerBtn" title="Importer une couche GeoJSON">
+        +
+    </button>
+
+    <input type="file" id="fileInput" accept=".geojson,.json" multiple>
+
+    <div class="notification" id="notification">
+        <span id="notificationText"></span>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script>
+        (function() {
+            let map;
+            let layers = {};
+
+            function initApp() {
+                // Initialisation de la carte
+                map = L.map('map').setView([50.8503, 4.3517], 13);
+
+                // Fond OpenStreetMap
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors',
+                    maxZoom: 19
+                }).addTo(map);
+
+                // Event listeners
+                document.getElementById('addLayerBtn').addEventListener('click', function() {
+                    document.getElementById('fileInput').click();
+                });
+
+                document.getElementById('fileInput').addEventListener('change', handleFileImport);
+            }
+
+            function showNotification(message, type) {
+                const notification = document.getElementById('notification');
+                const notificationText = document.getElementById('notificationText');
+                
+                notificationText.textContent = message;
+                notification.className = 'notification ' + type + ' show';
+                
+                setTimeout(function() {
+                    notification.classList.remove('show');
+                }, 3000);
+            }
+
+            function getRandomColor() {
+                const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#feca57', '#ff6b6b', '#48dbfb'];
+                return colors[Math.floor(Math.random() * colors.length)];
+            }
+
+            function addLayerToPanel(layerId, layerName) {
+                const customLayersDiv = document.getElementById('customLayers');
+                
+                const layerItem = document.createElement('div');
+                layerItem.className = 'layer-item active';
+                layerItem.dataset.layer = layerId;
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'layer-checkbox';
+                checkbox.checked = true;
+                checkbox.addEventListener('change', function(e) {
+                    toggleLayer(layerId, e.target.checked);
+                });
+                
+                const layerInfo = document.createElement('div');
+                layerInfo.className = 'layer-info';
+                
+                const layerNameDiv = document.createElement('div');
+                layerNameDiv.className = 'layer-name';
+                layerNameDiv.textContent = layerName;
+                
+                const layerDesc = document.createElement('div');
+                layerDesc.className = 'layer-description';
+                const featureCount = layers[layerId].getLayers().length;
+                layerDesc.textContent = featureCount + ' élément' + (featureCount > 1 ? 's' : '');
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'layer-delete';
+                deleteBtn.textContent = 'Supprimer';
+                deleteBtn.onclick = function(e) {
+                    e.stopPropagation();
+                    removeLayer(layerId);
+                };
+                
+                layerInfo.appendChild(layerNameDiv);
+                layerInfo.appendChild(layerDesc);
+                
+                layerItem.appendChild(checkbox);
+                layerItem.appendChild(layerInfo);
+                layerItem.appendChild(deleteBtn);
+                
+                customLayersDiv.appendChild(layerItem);
+            }
+
+            function toggleLayer(layerId, visible) {
+                const layerItem = document.querySelector('[data-layer="' + layerId + '"]');
+                if (visible) {
+                    map.addLayer(layers[layerId]);
+                    layerItem.classList.add('active');
+                } else {
+                    map.removeLayer(layers[layerId]);
+                    layerItem.classList.remove('active');
+                }
+            }
+
+            function removeLayer(layerId) {
+                map.removeLayer(layers[layerId]);
+                delete layers[layerId];
+                
+                const layerItem = document.querySelector('[data-layer="' + layerId + '"]');
+                layerItem.remove();
+                
+                showNotification('Couche supprimée', 'success');
+            }
+
+            function handleFileImport(e) {
+                const files = e.target.files;
+                
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(event) {
+                        try {
+                            const geojson = JSON.parse(event.target.result);
+                            
+                            const layerId = 'layer_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                            const layerName = file.name.replace(/\.[^/.]+$/, '');
+                            const color = getRandomColor();
+                            
+                            const layer = L.geoJSON(geojson, {
+                                style: {
+                                    color: color,
+                                    weight: 3,
+                                    opacity: 0.8,
+                                    fillOpacity: 0.3
+                                },
+                                pointToLayer: function(feature, latlng) {
+                                    return L.circleMarker(latlng, {
+                                        radius: 8,
+                                        fillColor: color,
+                                        color: '#fff',
+                                        weight: 2,
+                                        opacity: 1,
+                                        fillOpacity: 0.8
+                                    });
+                                },
+                                onEachFeature: function(feature, lyr) {
+                                    if (feature.properties) {
+                                        let popupContent = '<div style="max-width: 200px;">';
+                                        for (let key in feature.properties) {
+                                            popupContent += '<strong>' + key + ':</strong> ' + feature.properties[key] + '<br>';
+                                        }
+                                        popupContent += '</div>';
+                                        lyr.bindPopup(popupContent);
+                                    }
+                                }
+                            }).addTo(map);
+                            
+                            layers[layerId] = layer;
+                            
+                            map.fitBounds(layer.getBounds(), { padding: [50, 50] });
+                            
+                            addLayerToPanel(layerId, layerName);
+                            showNotification('Couche "' + layerName + '" importée avec succès', 'success');
+                            
+                        } catch (error) {
+                            showNotification('Erreur lors de l\'import de ' + file.name, 'error');
+                            console.error('Erreur:', error);
+                        }
+                    };
+                    
+                    reader.readAsText(file);
+                }
+                
+                e.target.value = '';
+            }
+
+            // Attendre que Leaflet soit chargé
+            if (typeof L !== 'undefined') {
+                initApp();
+            } else {
+                window.addEventListener('load', initApp);
+            }
+        })();
+    </script>
+</body>
+</html>
